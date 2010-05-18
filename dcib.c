@@ -5,9 +5,7 @@
 // Thanks to Ben Karsin and to Leon Bottou for contributing routines
 
 
-//#include "histo2.h"
 #include "utils.h"
-//#include "utils_ps.h"
 #include "utils_IB.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,12 +13,12 @@
 #include <math.h>
 #include <stdbool.h>
 
-// Names of files containing preprocessed data
+// Names of files containing preprocessor data
 const char* histoName = "data/histograms.txt";
 const char* probName = "data/probs.txt";
 
 
-//===========================================================
+//=================================
 void myusage(void)
 {
   fprintf(stderr,"Usage: dcib\n");
