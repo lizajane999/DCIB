@@ -29,7 +29,9 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
 // rescaled DKL
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
 // Output: DKL[ p(y|x) || p(y|c)]
-void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL);
+//oid DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL);
+//===========================================================================================================
+void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL);
 //==================================================================================================
 // DKL (of two vectors containing probability densities)
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
@@ -38,7 +40,7 @@ double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH]);
 //==================================================================================================
 // Input: XLENGTH, NCLUST, DKL[ p(y|x) || p(y|c)], p(c), beta
 // Output: p(c|x), p(c)
-bool Estep(int XLENGTH, int NCLUST, double beta, double **DKL, double pc[NCLUST], double **pcx);
+bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *pc, histogram_t *pcgx);
 //==================================================================================================
 // perturb cluster centers
 void perturb_pygc(double pert, int YLENGTH, int NCLUST, double **pygc);

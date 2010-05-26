@@ -109,6 +109,12 @@ void histogram_divide(histogram_t *self, int x, int y, double w)
   d->w /= w;
 }
 
+void histogram_mult(histogram_t *self, int x, int y, double w)
+{
+  record_t *d = lookup(self, x, y, 1);
+  d->w *= w;
+}
+
 double histogram_entropy(histogram_t *self)
 {
   int h;

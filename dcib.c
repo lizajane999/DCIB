@@ -44,7 +44,7 @@ int main(int argc, char * argv[])
   int HLENGTH;
   double px[XLENGTH];
   double py[YLENGTH];
-  double beta = 30.0;
+  double beta = 10.0;
   double F;
   double infocurve[4] = {1,1,1,1};
   //int modus = 0;

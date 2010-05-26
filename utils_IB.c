@@ -91,7 +91,7 @@ void pic_pygc(int XLENGTH, int YLENGTH, int NCLUST, double pygc[YLENGTH][NCLUST]
       for(l=0; l<k; l++){
 	if(list[l]==i){ // did this cluster get picked before?
 	  redo = true;
-	}
+	}	    
       }
       if(redo == false){ // is the center similar to one that got picked before?
 	for(j = 0; j< YLENGTH; j++){
@@ -290,7 +290,7 @@ double H_X(int XLENGTH, double px[XLENGTH])
   Hx /= log(2.0);
   return Hx;
 }
-
+//*************TODO*********************************
 //==================================================================================================
 // BAYES RULE
 // Input XLENGTH, YLENGTH, p(y|x), p(x)
@@ -329,6 +329,7 @@ bool Bayes(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH],double **
   return t;
 }
 
+//*************TODO******************************
 //==================================================================================================
 // compute p(c) from p(c|x) and p(x)
 bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NCLUST])
@@ -357,6 +358,7 @@ bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NC
   return t;
 }
 
+//*****************TODO********************************************
 //==================================================================================================
 // M-STEP in IB
 // Input: XLENGTH, YLENGTH, NCLUST, p(c|x), p(x), p(y|x)
@@ -439,7 +441,7 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
   
   return alarm;
 }
-//********************** TODO *********************************************
+
 //replace dkl rescaled with susanna's below !!!!!!
 //==================================================================================================
 // rescaled DKL
@@ -483,7 +485,7 @@ void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, hist
  for(i=0;i<XLENGTH;i++){
    mini[i] = 100000000;
    for(k=0;k<NCLUST;k++){
-     v = histogram_get(DKL,i,k);//**********what if this is zero????************
+     v = histogram_get(DKL,i,k);//if DKL is not set or zero, v = 0
      if(mini[i] > v){
        mini[i] = v;
      }
@@ -509,44 +511,49 @@ void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, hist
  }
  
 }
-
+//**************** TODO ************** send beta to this function *****************!!!!!!!!!!!!!
 //======================== NEW FUNCTION
 //==================================================================================================
 // rescaled DKL
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
 // Output: DKL[ p(y|x) || p(y|c)]
-// void Product_we_need(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, double **pygc, double **DKL)
-// {
-//   int i,j,k;
-//   double p;
-//   double mini[XLENGTH];
-//   bool debug = false;
-//   // reasoning: define m(x) = min_c DKL[p(y|x)||p(y|c)]
-//   // p(c|x) = ( p(c)/Z(x,beta) ) * exp{-beta*DKL[p(y|x)||p(y|c)]} 
-//   //        = ( p(c)/Z(x,beta) ) * exp{-beta*(DKL[p(y|x)||p(y|c)]-m(x))} * exp{beta*m(x)} 
-//   //        = ( p(c)/Z'(x,beta) ) * exp{-beta*(DKL[p(y|x)||p(y|c)]-m(x))}
-//   // with Z'(x,beta) = Z(x,beta) * exp{-beta*m(x)}
-//   // and Z'(x,beta) = sum_c p(c) * exp{-beta*(DKL[p(y|x)||p(y|c)]-m(x))} which is what
-//   // we use later in "Estep" to calculate p(c|x). 
-//   
-//   for(i=0;i<XLENGTH;i++){
-//     for(k=0;k<NCLUST;k++){
-//       DKL[i][k] = 0;
-//       for(j=0;j<YLENGTH;j++){
-// 	if((p = histogram_get(pygx,i,j)) && pygc[j][k] > 0){
-// 	  // printf("p= %f, pygc[%d][%d] = %f\n", p, j, k, pygc[j][k]);
-// 	  DKL[i][k] *= pow(pygc[j][k], p);
-// 	}
-//       }
-//     }
-//   }
-//   if(debug)
-//   {
-//     printf("\n DKL_rescaled: DKL = \n");
-//     //print_mat2(XLENGTH, NCLUST, DKL);
-//   }
+void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL)
+{
+   int i,j,k;
+   double p,q,v;
+   bool debug = true;
+   double beta = 1.1;
+  // reasoning: p(c|x) ~ p_(c) * e ^ {-1/T \sum_{y} (p(y|x)* log p(y|x)) - \sum_{y}(p(y|x) * log p(y|c))}
+  // 			  \sum_{y} (p(y|x)* log p(y|x))  is constant --> Z (norm)
+  //        	p(c|x) ~ p(c) * e ^ (1/T \sum_{y} (p(y|x) * log p(y|c)))
+  //        		~ p(c) \prod_{y} e^(1/T * p(y|x)* log p(y|c))
+  // 			~ p(c) \prod_{y} (p(y|c))^{p(y|x)/T}
+  //			~ p(c) \prod_{y} {(p(y|c))^p(|y|x)}^beta
+  // tf: if p(y|x) = 0, stuff inside prod = 1 --> no need to calc 
+  // we use later in "Estep" to calculate p(c|x). 
   
-
+  for(i=0;i<XLENGTH;i++){
+    for(k=0;k<NCLUST;k++){
+      for(j=0;j<YLENGTH;j++){
+	if((p = histogram_get(pygx,i,j)) && (q = histogram_get(pygc,j,k))){//only make non zero ones
+	  // printf("p= %f, pygc[%d][%d] = %f\n", p, j, k, pygc[j][k]);
+	  if((v = histogram_get(DKL,i,k)))
+	  {//have to check for zero or not set yet
+	    histogram_set(DKL,i,k,(v * pow(q,(p*beta))));
+	  }else{//don't multiply by zero
+	    histogram_set(DKL,i,k, (pow(q,(p*beta))));
+	  }
+	}
+      }
+    }
+  }
+  if(debug)
+  {
+    printf("\n DKL_Prod: DKL = \n");
+    print_mat(XLENGTH, NCLUST, DKL);
+  }
+  
+}
 
 //==================================================================================================
 // DKL (of two vectors containing probability densities)
@@ -573,50 +580,85 @@ double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH])
 // E-STEP in IB
 // Input: XLENGTH, NCLUST, DKL[ p(y|x) || p(y|c)], p(c), beta
 // Output: p(c|x)
-bool Estep(int XLENGTH, int NCLUST, double beta, double **DKL, double pc[NCLUST], double **pcgx)
+bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *pc, histogram_t *pcgx)
 {
   int i,k;
+  double p,q,v;
   double sumup[XLENGTH];
   bool t = false;
   bool alarm = false;
-  bool debug = false;
+  bool debug = true;
+  bool useDKLReScale = false;
 
    printf("\nEstep: computing pcx... exp(-beta*DKL):\n");
    //*******************************TODO********************************************************
-//   // compute p(c|x)*Z = p(c)*e^(-beta*DKL(c)) 
-//   for(i=0;i<XLENGTH;i++){
-//     sumup[i] = 0.0;
-//     if(debug) printf("x = %d\n",i);
-//     for (k=0; k<NCLUST; k++){
-//       pcgx[k][i] = pc[k] * pow(Product_new,beta);
-//       /// old: pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
-//       if(debug) printf("p(c = %d) = %f; exponent = %f; p(c|x) = %f\n", k, pc[k], exp( - beta * DKL[i][k]), pcgx[k][i]);
-//       if(pcgx[k][i] < EPS){
-// 	t = true;
-//       }
-//       sumup[i] += pcgx[k][i];
-//     }
-//     if(debug) printf("\n");
-//   }//i-loop
-  
-  if(debug)
-  {
-   printf("\nEstep: BEFORE NORMALIZATION:\n");
-  // print_mat_inv(NCLUST,XLENGTH,pcgx);
-  }
-  if(t == true){
-    alarm = add_EPS_pxgy(NCLUST, XLENGTH, pcgx); // redo and add eps
-    if(alarm == true){
-      printf("Estep: add_EPS_pxgy returns alarm. p(c|x) has zeros.\n");
-    }
-  }
-  if (t ==false){ // normalize
-    for(i=0;i<XLENGTH;i++){ 
-      for (k=0; k<NCLUST; k++){
-	pcgx[k][i] /= sumup[i];
+//   // compute p(c|x)*Z = p(c)*e^(-beta*DKL(c))
+  if(!useDKLReScale){
+    for(i=0;i<XLENGTH;i++){
+      sumup[i] = 0.0;
+      if(debug) {printf("x = %d\n",i);}
+	for (k=0; k<NCLUST; k++){
+	  /************ Using Product ******************************/ 
+	  //check for empties
+	  // this is p(c) * (prod_{y} (p(y|c))^p(y|x))^beta
+	  if((p = histogram_get(pc,k,0)) && (q = histogram_get(DKL,i,k)))
+	  {
+	    v = p * q;//pow(q);//,beta);///underflowing!!
+	    histogram_set(pcgx,k,i,v);
+	/// old: pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
+	    if(debug) printf("p(c = %d) = %f; DKL(x = %d,c = %d) = %f; pow = %f; p(c|x) = %f\n", k, p, i,k,q, pow(q,beta),v);
+	    if(v < EPS){
+	      t = true;
+	      printf("setting t to true!\n");
+	    }
+	    sumup[i] += v;
+	  }
       }
-    }   
+      if(debug) printf("\n");
+    }//i-loop
   }
+  else{ //using DKL-rescaled
+    // printf("\nEstep: computing pcx... exp(-beta*DKL):\n");
+    // compute p(c|x)*Z = p(c)*e^(-beta*DKL(c)) 
+    for(i=0;i<XLENGTH;i++){
+      sumup[i] = 0.0;
+       printf("x = %d\n",i);
+      for (k=0; k<NCLUST; k++){
+	if((p = histogram_get(pc,k,0)) && (q = histogram_get(DKL,i,k)))
+	{
+	  // OLD WAY pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
+	  v = exp( - beta * q);
+	  histogram_set(pcgx,k,i,(p * v));
+	  printf("p(c = %d) = %f; exponent = %f; p(c|x) = %f\n", k, p, v, (p*v));
+	  if(v < EPS){
+	    t = true;
+	    printf("setting t to true!\n");
+	  }
+	  sumup[i] += (p*v);
+	}
+      }
+      // printf("\n");
+    }//i-loop
+  }
+  
+   if(debug)
+   {
+    printf("\nEstep: BEFORE NORMALIZATION:\n");
+    print_hist_inv(NCLUST,XLENGTH,pcgx);
+   }
+//   if(t == true){
+//     alarm = add_EPS_pxgy(NCLUST, XLENGTH, pcgx); // redo and add eps
+//     if(alarm == true){
+//       printf("Estep: add_EPS_pxgy returns alarm. p(c|x) has zeros.\n");
+//     }
+//   }
+//   if (t ==false){ // normalize
+//     for(i=0;i<XLENGTH;i++){ 
+//       for (k=0; k<NCLUST; k++){
+// 	pcgx[k][i] /= sumup[i];
+//       }
+//     }   
+//   }
   return alarm;
 }
 
@@ -735,6 +777,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   int count;
   bool alarm = false;
   bool debug = true; //for verbose debug printing
+  bool useDKLReScale = false;
   double v,conv;
   double sum = 0;
 
@@ -789,14 +832,8 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
     printf("p(y|c):\n");
     histogram_print(pygc);
   }
-    //===========================
 
   printf("EM: NCLUST = %d\n", NCLUST);
-//   // add small noise to input distribution!
-//    sum = add_EPS_pxy(XLENGTH, YLENGTH, pxy);
-//    if(sum > 1+ EPS || sum < 1 - EPS){
-//      printf("\n EM: add_EPS_pxy returns error: sum_xy p(x,y) = %f\n", sum);
-//    }
 
   // get p(y) from p(x,y) assuming that p(x,y) is normalized properly
   marg_py(XLENGTH, YLENGTH, pxy, py);
@@ -844,8 +881,11 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
  //********* while(conv >= 0.1/beta){ // 0.000001){ // scale by beta.
     
     // compute DKL. input: p(y|x) p(y|c)
+  if(useDKLReScale){
     DKL_rescaled(XLENGTH, YLENGTH, NCLUST, histo, pygc, DKL);  
-   
+  }else{
+    DKL_Prod(XLENGTH, YLENGTH, NCLUST, histo, pygc, DKL);  
+  }
      if(printme == true){
       printf("\n EM: DKL at count = %d\n", count);
     //  print_mat(XLENGTH, NCLUST, DKL);
@@ -853,15 +893,13 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
       printf("\n EM: p(c) at count = %d\n", count);
     //  print_vec(NCLUST, pc);
     } 
-/*********************************************************************************
-    // compute p(c|x). input: DKL, p(c)
-    
+    // compute p(c|x) with Estep. input: DKL, p(c)
     alarm = Estep(XLENGTH, NCLUST, beta, DKL, pc, pcgx);
     if(alarm == true){
       printf("EM: Estep returns alarm. At iteration %d\n", count);
       alarm = false;
     }
-
+/*
     if(printme == true){
       printf("\n EM: p(c|x) at count = %d\n", count);
      // print_mat2(NCLUST, XLENGTH, pcgx);
