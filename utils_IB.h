@@ -31,7 +31,7 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
 // Output: DKL[ p(y|x) || p(y|c)]
 //oid DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL);
 //===========================================================================================================
-void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL);
+void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL, double beta);
 //==================================================================================================
 // DKL (of two vectors containing probability densities)
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)

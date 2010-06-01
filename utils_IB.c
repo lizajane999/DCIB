@@ -517,18 +517,17 @@ void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, hist
 // rescaled DKL
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
 // Output: DKL[ p(y|x) || p(y|c)]
-void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL)
+void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogram_t *pygc, histogram_t *DKL, double beta)
 {
    int i,j,k;
    double p,q,v;
    bool debug = true;
-   double beta = 1.1;
+ 
   // reasoning: p(c|x) ~ p_(c) * e ^ {-1/T \sum_{y} (p(y|x)* log p(y|x)) - \sum_{y}(p(y|x) * log p(y|c))}
   // 			  \sum_{y} (p(y|x)* log p(y|x))  is constant --> Z (norm)
   //        	p(c|x) ~ p(c) * e ^ (1/T \sum_{y} (p(y|x) * log p(y|c)))
   //        		~ p(c) \prod_{y} e^(1/T * p(y|x)* log p(y|c))
   // 			~ p(c) \prod_{y} (p(y|c))^{p(y|x)/T}
-  //			~ p(c) \prod_{y} {(p(y|c))^p(|y|x)}^beta
   // tf: if p(y|x) = 0, stuff inside prod = 1 --> no need to calc 
   // we use later in "Estep" to calculate p(c|x). 
   
@@ -537,11 +536,12 @@ void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogra
       for(j=0;j<YLENGTH;j++){
 	if((p = histogram_get(pygx,i,j)) && (q = histogram_get(pygc,j,k))){//only make non zero ones
 	  // printf("p= %f, pygc[%d][%d] = %f\n", p, j, k, pygc[j][k]);
+	  p = p*beta;//divide p(y|c) by temp
 	  if((v = histogram_get(DKL,i,k)))
 	  {//have to check for zero or not set yet
-	    histogram_set(DKL,i,k,(v * pow(q,(p*beta))));
+	    histogram_set(DKL,i,k,(v * pow(q,p)));
 	  }else{//don't multiply by zero
-	    histogram_set(DKL,i,k, (pow(q,(p*beta))));
+	    histogram_set(DKL,i,k, (pow(q,p)));
 	  }
 	}
       }
@@ -603,17 +603,21 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
 	  // this is p(c) * (prod_{y} (p(y|c))^p(y|x))^beta
 	  if((p = histogram_get(pc,k,0)) && (q = histogram_get(DKL,i,k)))
 	  {
-	    v = p * q;//pow(q);//,beta);///underflowing!!
-	    histogram_set(pcgx,k,i,v);
-	/// old: pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
-	    if(debug) printf("p(c = %d) = %f; DKL(x = %d,c = %d) = %f; pow = %f; p(c|x) = %f\n", k, p, i,k,q, pow(q,beta),v);
-	    if(v < EPS){
-	      t = true;
-	      printf("setting t to true!\n");
+	    v = p * q;//underflowing!!
+	    if(v){
+	      histogram_set(pcgx,k,i,v);
+	      sumup[i] += v;
 	    }
-	    sumup[i] += v;
-	  }
-      }
+	/// old: pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
+	    if(debug){ 
+	      printf("p(c = %d) = %e; DKL(x = %d,c = %d) = %e; p(c|x) = %e\n", k, p, i,k,q,v);
+	    }
+//**************** ALLOWING ZEROS HERE! ************************************
+	    // 	    if(v < EPS){
+// 	      t = true;
+// 	      printf("setting t to true!\n");
+	  } 
+      }//for k loop
       if(debug) printf("\n");
     }//i-loop
   }
@@ -629,7 +633,7 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
 	  // OLD WAY pcgx[k][i] = pc[k] * exp( - beta * DKL[i][k]); // + EPS;
 	  v = exp( - beta * q);
 	  histogram_set(pcgx,k,i,(p * v));
-	  printf("p(c = %d) = %f; exponent = %f; p(c|x) = %f\n", k, p, v, (p*v));
+	  printf("p(c = %d) = %e; exponent = %e; p(c|x) = %e\n", k, p, v, (p*v));
 	  if(v < EPS){
 	    t = true;
 	    printf("setting t to true!\n");
@@ -644,7 +648,7 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
    if(debug)
    {
     printf("\nEstep: BEFORE NORMALIZATION:\n");
-    print_hist_inv(NCLUST,XLENGTH,pcgx);
+   // print_hist_inv(NCLUST,XLENGTH,pcgx);
    }
 //   if(t == true){
 //     alarm = add_EPS_pxgy(NCLUST, XLENGTH, pcgx); // redo and add eps
@@ -652,13 +656,15 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
 //       printf("Estep: add_EPS_pxgy returns alarm. p(c|x) has zeros.\n");
 //     }
 //   }
-//   if (t ==false){ // normalize
-//     for(i=0;i<XLENGTH;i++){ 
-//       for (k=0; k<NCLUST; k++){
-// 	pcgx[k][i] /= sumup[i];
-//       }
-//     }   
-//   }
+//   if (t ==false){ 
+// normalize
+    for(i=0;i<XLENGTH;i++){ 
+      for (k=0; k<NCLUST; k++){
+	if((v = histogram_get(pcgx,k,i))){
+	  histogram_set(pcgx,k,i,(v /sumup[i]));
+       }
+     }   
+   }
   return alarm;
 }
 
@@ -884,7 +890,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   if(useDKLReScale){
     DKL_rescaled(XLENGTH, YLENGTH, NCLUST, histo, pygc, DKL);  
   }else{
-    DKL_Prod(XLENGTH, YLENGTH, NCLUST, histo, pygc, DKL);  
+    DKL_Prod(XLENGTH, YLENGTH, NCLUST, histo, pygc, DKL, beta);  
   }
      if(printme == true){
       printf("\n EM: DKL at count = %d\n", count);
