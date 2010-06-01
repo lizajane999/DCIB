@@ -1,0 +1,12 @@
+README file for DCIB code
+Lisa Miller 6/1/2010
+
+
+To install:
+run make
+
+to run ./dcib <num docs> <num words> <max num clusters>
+
+doc histograms should be in data/ subdirectory
+
+
