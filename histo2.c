@@ -106,7 +106,9 @@ void histogram_set(histogram_t *self, int x, int y, double w)
 void histogram_divide(histogram_t *self, int x, int y, double w)
 {
   record_t *d = lookup(self, x, y, 1);
-  d->w /= w;
+  if(d){//otherwise is zero and remains so
+    d->w /= w;
+  }
 }
 
 void histogram_mult(histogram_t *self, int x, int y, double w)

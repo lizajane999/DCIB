@@ -10,3 +10,5 @@ to run ./dcib <num docs> <num words> <max num clusters>
 doc histograms should be in data/ subdirectory
 
 
+CURRENTLY:
+in EM recoding M-step

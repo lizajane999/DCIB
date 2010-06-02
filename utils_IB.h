@@ -18,13 +18,15 @@ void conditional(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH],
 double I_XY(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH], double py[YLENGTH]);
 double I_YgX(int XLENGTH, int YLENGTH, double **pygc, double px[XLENGTH], double py[YLENGTH]);
 double H_X(int XLENGTH, double px[XLENGTH]);
-bool Bayes(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH],double **pxgy);
+//bool Bayes(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH],double **pxgy);
+bool Bayes(int XLENGTH, int YLENGTH, histogram_t *pygx, double px[XLENGTH], histogram_t *pxgy);
 bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NCLUST]);
 //==================================================================================================
 // Input: XLENGTH, YLENGTH, NCLUST, p(c|x), p(x), p(y|x)
 // Output: p(y|c)
 // Mstep(XLENGTH, YLENGTH, NCLUST, pygx, px, pcgx, pygc);
-bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XLENGTH], double **pcgx, double **pygc);
+//bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XLENGTH], double **pcgx, double **pygc);
+bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XLENGTH], histogram_t *pcgx, histogram_t *pygc);
 //==================================================================================================
 // rescaled DKL
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)

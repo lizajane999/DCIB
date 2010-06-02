@@ -36,19 +36,19 @@ void ini_pygc(int NCLUSTnow, int YLENGTH, int NCLUST, histogram_t *pygc)
     for(i = 0; i< YLENGTH; i++){
       histogram_divide(pygc,i,k,sum);
       v = histogram_get(pygc,i,k);
-      if(debug){ printf("pygc[%d][%d] = %f ", i, k, v);}
+      if(debug){ printf("pygc[%d][%d] = %e ", i, k, v);}
       checksum += v;
      }
     if(debug){printf("\n");}
     if((double)checksum > (double)1 + (double)EPS || (double)checksum < (double)1 - (double)EPS){
-      printf("ini_pygc: error normalizing p(y|c). checksum = %f\n", checksum);
+      printf("ini_pygc: error normalizing p(y|c). checksum = %e\n", checksum);
     }
    }
   if(debug){
     printf("ini_pygc: output: NCLUST = %d NCLUSTnow = %d INITIAL centers:\n", NCLUSTnow, NCLUST);  
     for(k=0; k< NCLUST; k++){
       for(i = 0; i< YLENGTH; i++){
-	printf("%f\t",histogram_get(pygc,i,k));
+	printf("%e\t",histogram_get(pygc,i,k));
       }
       printf("\n");	
     }
@@ -139,7 +139,7 @@ void ini_pcgx(int NCLUST, int XLENGTH, histogram_t *pcgx)
     }
     for(k=0;k<NCLUST;k++){
       histogram_divide(pcgx,k,i,sum);
-      printf("%f\t", histogram_get(pcgx,k,i));
+      printf("%e\t", histogram_get(pcgx,k,i));
     }
     printf("\n");	
   }
@@ -163,17 +163,17 @@ void marg_px(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH])
     for(j = 0; j < YLENGTH; j++){
       if((p = histogram_get(pxy,i,j))){
 	px[i] += p; 
-	//printf("pxy[%d][%d] = %f\n",i,j,p);
+	//printf("pxy[%d][%d] = %e\n",i,j,p);
       }
     }
-   // printf("px[%d] = %f\n",i,px[i]);
+   // printf("px[%d] = %e\n",i,px[i]);
     checksum += px[i]; 
   }
   if(checksum > 1 + 0.00001 || checksum < 1 - 0.00001){
-    printf("marg_px: error normalizing p(x). sum = %f\n", checksum);
+    printf("marg_px: error normalizing p(x). sum = %e\n", checksum);
   } 
     //       else{
-      // 	printf("%f ",z);
+      // 	printf("%e ",z);
       //       }
   }
 
@@ -197,7 +197,7 @@ void marg_py(int XLENGTH, int YLENGTH,  histogram_t *pxy, double py[YLENGTH])
   }
 
   if(checksum > 1 + 0.00001 || checksum < 1 - 0.00001){
-    printf("marg_py: error normalizing p(y). sum = %f\n", checksum);
+    printf("marg_py: error normalizing p(y). sum = %e\n", checksum);
   }
 }
 
@@ -226,7 +226,7 @@ void conditional(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH],
       }
     }
     if(checksum > (1 + 0.00001) || checksum < (1 - 0.00001)){
-      printf("conditional: error normalizing p(y|x). sum = %f\n", checksum);
+      printf("conditional: error normalizing p(y|x). sum = %e\n", checksum);
     } 
   }
 
@@ -295,36 +295,47 @@ double H_X(int XLENGTH, double px[XLENGTH])
 // BAYES RULE
 // Input XLENGTH, YLENGTH, p(y|x), p(x)
 // Output p(x|y)
-bool Bayes(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH],double **pxgy)
+
+// called   alarm = Bayes(XLENGTH, NCLUST, pcgx, px, pxgc);
+bool Bayes(int XLENGTH, int YLENGTH, histogram_t *pygx, double px[XLENGTH], histogram_t *pxgy)
 {
   int i, j;
+  double v,w;
   double sum = 0;
   double checksum = 0;
   bool t = false;
   
-  printf("Bayes:\n");
+  printf("In Bayes:\n");
   // p(x|y) = p(y|x)*p(x) / (sum_x p(y|x)*p(x) )
-  for(j=0;j<YLENGTH;j++){ 
+  for(j=0;j<YLENGTH;j++){ //for each cluster
     sum = 0;
  //   printf("C = %d\t", j);
-    for(i=0;i<XLENGTH;i++){
-      //printf("X = %d : px[i] = %f : pcgx = %f \t", i, px[i], pygx[i][j]);
-      pxgy[i][j] = pygx[j][i] * px[i];
-      sum += pygx[j][i] * px[i];
+    for(i=0;i<XLENGTH;i++){ //for each document
+      if((v = histogram_get(pygx,j,i))){//skipping any p(c|x) = 0
+      //printf("X = %d : px[i] = %e : pcgx = %e \t", i, px[i], pygx[i][j]);
+      //pxgy[i][j] = pygx[j][i] * px[i];
+	v *= px[i];
+	histogram_set(pxgy, i ,j, v);
+	sum += v;
+      }
     }
     //printf("\n");
     if(sum < EPS){
-      printf("Bayes: Error in input distribution: sum_x p(y|x)p(x) = %f at y = %d", sum, j);
+      printf("Bayes: Error in input distribution: sum_x p(y|x)p(x) = %e at y = %d", sum, j);
       t = true;
     }
     checksum = 0;
     for(i=0;i<XLENGTH;i++){
-      pxgy[i][j] /= sum;
-      checksum += pxgy[i][j];
+      if((w = histogram_get(pxgy, i, j))){
+	histogram_divide(pxgy, i,j,sum);
+	checksum += w;
+      }
     }
-    if(checksum > 1 + 0.000000001 || checksum < 1 - 0.000000001){
-      printf("Bayes: P(x|y) not normalized properly. checksum =  %f\n",checksum);
+    if(checksum > 1.0000001 || checksum < 0.9999999){
+      printf("Bayes: P(x|y) not normalized properly\n:");
     }
+    printf("Bayes: checksum =  %e\n",checksum);
+    
   }
   return t;
 }
@@ -345,99 +356,94 @@ bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NC
     }
     if(pc[k] == 0){
       t = true;
-   //   printf("P_c: pc[%d] = %f\n", k, pc[k]);
+   //   printf("P_c: pc[%d] = %e\n", k, pc[k]);
     }
     checksum += pc[k]; 
   }
 
   if(checksum > 1.0001 || checksum < 1 - 0.0001){
-    printf("P_c: error normalizing p(c). sum = %f\n", checksum);
+    printf("P_c: error normalizing p(c). sum = %e\n", checksum);
     t = true;
   }
 
   return t;
 }
 
-//*****************TODO********************************************
 //==================================================================================================
 // M-STEP in IB
 // Input: XLENGTH, YLENGTH, NCLUST, p(c|x), p(x), p(y|x)
 // Output: p(y|c)
-// Mstep(XLENGTH, YLENGTH, NCLUST, pygx, px, pcgx, pygc);
-bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XLENGTH], double **pcgx, double **pygc)
+bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XLENGTH], histogram_t *pcgx, histogram_t *pygc)
 { 
- // double pxgc[XLENGTH][NCLUST];
+
   int i,j,k;
   double p,sum = 0;
   bool alarm = false;
   bool t = false;
   bool debug = false;
+  /// eliminate below prob!
   // if the probability of one cluster is absolutely zero, this will result in a NaN (+inf) in p(x|c). 
   // to avoind that, have to ad small noise to p(c|x) in Estep or EM !!
-
-  double** pxgc;
-  //allocate pointer memory for first dimension
-  pxgc = (double**)malloc(XLENGTH*sizeof(double));
-  if(NULL == pxgc){free(pxgc); printf("Memory allocation failed while allocating for pxgc[].\n"); exit(-1);}
-  /*allocate memory for second dimension */
-  for(i = 0; i < XLENGTH;i++)
-  {
-    pxgc[i] = (double *) malloc( NCLUST * sizeof(double) );
-    if(NULL == pxgc[i]){free(pxgc[i]); printf("Memory allocation failed while allocating for matrix[x][].\n"); exit(-1);}
-  }
+  histogram_t *pxgc;
+  pxgc = histogram_create(XLENGTH*NCLUST);
+///***************************** HERE ******************************************************
+  printf("Mstep: \n"); 
   // compute p(x|c)
   alarm = Bayes(XLENGTH, NCLUST, pcgx, px, pxgc);
   if (alarm == true){
     printf("Mstep: Bayes returns alarm. p(c|x) or p(x) must have zeros.\n");
   }
-  printf("Mstep: \n"); 
+
   if(debug){
-    printf("\n Mstep: p(x|c)\n");     
+     printf("\n Mstep: p(x|c)\n");     
     for(i=0; i<XLENGTH; i++){
       for(k=0; k<NCLUST; k++){
-	printf("%f \t", pxgc[i][k]); 
+	printf("%e \t", histogram_get(pxgc,i,k); 
       }
       printf("\n");
     }
   }
+  
+  
+  //TODO ********* have to clear out old histogram here instead ***********************************
   // compute p(y|c) = \sum_x p(y|x) p(x|c)
   for(j=0; j<YLENGTH; j++){
     for(k=0; k<NCLUST; k++){ 
       pygc[j][k] = 0;
     }
   } 
-  t = false;
-  // printf("\np(y|c); p(y|x); p(x|c):\n");    
-  for(k=0; k<NCLUST; k++){ 
-    sum = 0;    
-    for(j=0; j<YLENGTH; j++){
-      for(i=0; i<XLENGTH; i++){
-	if((p = histogram_get(pygx,i,j))){
-	  pygc[j][k] += (p * pxgc[i][k]);
-	}
-	if(debug) printf("p(x|c)[%d][%d] = %f\n",i,k, pxgc[i][k]);
-      }
-      if(debug) printf("\n p(y|c)[%d][%d] = %f \n\n", j,k,pygc[j][k]);
-      sum += pygc[j][k];
-      if(pygc[j][k] < EPS){ // check if p(y|c) = 0
-	t = true;
-	//printf("Mstep: alarm. pygc[%d][%d] = %f\n", j, k, pygc[j][k]); 
-      }
-    }
-    // printf("\n");
-    if(sum > 1 + 0.0001 || sum < 1 - 0.0001){
-      printf("Mstep: P(y|c) not normalized properly. sum =  %f\n",sum);
-    }
-  }
-  if (t == true){
-    alarm = add_EPS_pxgy(YLENGTH, NCLUST, pygc);
-  }
-  if (alarm == true){
-    printf("Mstep: add_EPS_pxgy returns alarm. p(y|c) has zeros.\n");
-  }
-  for(i = 0; i < XLENGTH; i++)
-    free(pxgc[i]);
-  free(pxgc);
+//   t = false;
+//   // printf("\np(y|c); p(y|x); p(x|c):\n");    
+//   for(k=0; k<NCLUST; k++){ 
+//     sum = 0;    
+//     for(j=0; j<YLENGTH; j++){
+//       for(i=0; i<XLENGTH; i++){
+// 	if((p = histogram_get(pygx,i,j))){
+// 	  pygc[j][k] += (p * pxgc[i][k]);
+// 	}
+// 	if(debug) printf("p(x|c)[%d][%d] = %e\n",i,k, pxgc[i][k]);
+//       }
+//       if(debug) printf("\n p(y|c)[%d][%d] = %e \n\n", j,k,pygc[j][k]);
+//       sum += pygc[j][k];
+//       if(pygc[j][k] < EPS){ // check if p(y|c) = 0
+// 	t = true;
+// 	//printf("Mstep: alarm. pygc[%d][%d] = %e\n", j, k, pygc[j][k]); 
+//       }
+//     }
+//     // printf("\n");
+//     if(sum > 1 + 0.0001 || sum < 1 - 0.0001){
+//       printf("Mstep: P(y|c) not normalized properly. sum =  %e\n",sum);
+//     }
+//   }
+//   if (t == true){
+//     alarm = add_EPS_pxgy(YLENGTH, NCLUST, pygc);
+//   }
+//   if (alarm == true){
+//     printf("Mstep: add_EPS_pxgy returns alarm. p(y|c) has zeros.\n");
+//   }
+//   for(i = 0; i < XLENGTH; i++)
+//     free(pxgc[i]);
+//   free(pxgc);
   
   return alarm;
 }
@@ -467,7 +473,7 @@ void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, hist
      for(j=0;j<YLENGTH;j++){
        //if both of these are not zeros
        if((pyx = histogram_get(pygx,i,j)) && (pyc = histogram_get(pygc,j,k))){
-	// printf("p= %f, pygc[%d][%d] = %f\n", p, j, k, pygc[j][k]);
+	// printf("p= %e, pygc[%d][%d] = %e\n", p, j, k, pygc[j][k]);
 	v = pyx * log( pyx / pyc );
 	histogram_add(DKL,i,k,v);
 	// DKL[i][k] += p * log( p / pygc[j][k] );
@@ -535,7 +541,7 @@ void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogra
     for(k=0;k<NCLUST;k++){
       for(j=0;j<YLENGTH;j++){
 	if((p = histogram_get(pygx,i,j)) && (q = histogram_get(pygc,j,k))){//only make non zero ones
-	  // printf("p= %f, pygc[%d][%d] = %f\n", p, j, k, pygc[j][k]);
+	  // printf("p= %e, pygc[%d][%d] = %e\n", p, j, k, pygc[j][k]);
 	  p = p*beta;//divide p(y|c) by temp
 	  if((v = histogram_get(DKL,i,k)))
 	  {//have to check for zero or not set yet
@@ -570,7 +576,7 @@ double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH])
  for(i=0;i<XLENGTH;i++){
    if(px1[i] > 0 && px2[i] > 0 ){
      Dkl += px1[i] * log( px1[i] / px2[i] );
-     if(debug)printf("px1 = %f; px2 = %f; Dkl = %f\n",px1[i],px2[i],Dkl);
+     if(debug)printf("px1 = %e; px2 = %e; Dkl = %e\n",px1[i],px2[i],Dkl);
    }
  }
  return Dkl;
@@ -621,7 +627,7 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
       if(debug) printf("\n");
     }//i-loop
   }
-  else{ //using DKL-rescaled
+  else{ //using old way --> DKL-rescaled
     // printf("\nEstep: computing pcx... exp(-beta*DKL):\n");
     // compute p(c|x)*Z = p(c)*e^(-beta*DKL(c)) 
     for(i=0;i<XLENGTH;i++){
@@ -684,7 +690,7 @@ void perturb_pygc(double pert, int YLENGTH, int NCLUST, double **pygc){
       sum += pygc[j][k];
     }
     if(sum < EPS){
-      printf("perturb_pygc: ERROR. sum = %f \n", sum);
+      printf("perturb_pygc: ERROR. sum = %e \n", sum);
     }
     else{
       for(j=0;j<YLENGTH;j++){
@@ -699,7 +705,7 @@ void perturb_pygc(double pert, int YLENGTH, int NCLUST, double **pygc){
       checksum += pygc[j][k];
     }
     if(checksum < 1 - EPS || checksum > 1 + EPS){
-      printf("perturb_pygc: NORMALIZATION ERROR: checksum = %f \n", sum);
+      printf("perturb_pygc: NORMALIZATION ERROR: checksum = %e \n", sum);
     }
   }
 }
@@ -745,7 +751,7 @@ bool split(int NCLUSTnow[], int NCLUSTmax, int YLENGTH, double **pygc)
 	checksum += pygc[j][k];
       }
       if(checksum > 1+EPS || checksum < 1-EPS){
-	printf("split: ERROR. normalization wrong at cluster %d. sum = %f\n", k, checksum);
+	printf("split: ERROR. normalization wrong at cluster %d. sum = %e\n", k, checksum);
       }
     }
     
@@ -905,19 +911,19 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
       printf("EM: Estep returns alarm. At iteration %d\n", count);
       alarm = false;
     }
-/*
+
     if(printme == true){
       printf("\n EM: p(c|x) at count = %d\n", count);
      // print_mat2(NCLUST, XLENGTH, pcgx);
     }
-    
+//********************************* TODO ***********************************************************    
     // compute p(y|c). input: p(y|x), p(c|x), p(x).
     alarm = Mstep(XLENGTH, YLENGTH, NCLUST, histo, px, pcgx, pygc);
     if(alarm == true){
       printf("EM: Mstep returns alarm. At iteration %d\n", count);
       alarm = false;
     }
-
+/*
     if(printme == true){
       printf("\n EM: p(y|c) at count = %d\n", count);
      // print_mat2(YLENGTH, NCLUST, pygc);
@@ -937,7 +943,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
     conv = D_KL(NCLUST, pc, pc_old);
 
     count=count+1;
-    printf("EM: iteration %d; conv = %f; beta = %f\n\n", count, conv,beta);
+    printf("EM: iteration %d; conv = %e; beta = %e\n\n", count, conv,beta);
   } //conv loop
   
   // copy back 
@@ -978,7 +984,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   
   //F = Icy - Icx/beta; // F unscaled
   F = Icy / Ixy - Icx / (Hx * beta); // F scaled
-  //  printf("EM result: F = %f \n", F);
+  //  printf("EM result: F = %e \n", F);
 */
 //clear hashes
   histogram_destroy(DKL);
@@ -1188,7 +1194,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
       //print_mat2(2*NCLUST, XLENGTH, FULLpcgx);
     }
     if(plotme == true){   
-	printf("Loop %d: b = %f\n", loopc, b);
+	printf("Loop %d: b = %e\n", loopc, b);
  	printf(" CENTERS before merging:\n");
  	//print_mat_inv(YLENGTH,2*NCLUST,FULLpygc);
     }
@@ -1215,7 +1221,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
     }
   }
   if(plotme == true){ 
-    printf("\nDONE FILLING UP CLUSTERS!!!\nNumber of clusters: NCLUSTnew = %d\n F = %f\nCenters are:\n", NCLUSTnew, F);
+    printf("\nDONE FILLING UP CLUSTERS!!!\nNumber of clusters: NCLUSTnew = %d\n F = %e\nCenters are:\n", NCLUSTnew, F);
    // print_mat_inv(YLENGTH,NCLUST,pygc);
   }
   De = false;
@@ -1239,7 +1245,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
   double oldPc[NCLUST]; 
   double conv = 100.0;
   while(De == false && conv > 0.001){
-    //printf("beta = %f\n", b);
+    //printf("beta = %e\n", b);
     if(b > 100.0)
       die("Anneal: Not converging to hard assignments. EXITING");
     // allow splitting and merging to avoid degeneracies
@@ -1253,7 +1259,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
     F = EM(XLENGTH, YLENGTH, NCLUSTnew, 2*NCLUST, b, pxy, histo, FULLpcgx, FULLpygc, FULLpc, infocurve, modus, false);
     
     if(plotme == true){   
-      printf("Loop %d: b = %f\n", loopc, b);
+      printf("Loop %d: b = %e\n", loopc, b);
       printf(" CENTERS before merging:\n");
      // print_mat_inv(YLENGTH,2*NCLUST,FULLpygc);
     }
@@ -1282,7 +1288,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
     De = det(NCLUSTnew, NCLUST, XLENGTH, pcgx);
     //De = det(NCLUST, NCLUST, XLENGTH, pcgx);
     if(plotme == true){
-      printf("b = %f \t F = %f\n ASSIGNMENTS: \n", b, F);
+      printf("b = %e \t F = %e\n ASSIGNMENTS: \n", b, F);
      // print_mat_inv(NCLUST, XLENGTH, pcgx);
       printf("\n CENTERS:\n");
      // print_mat_inv(YLENGTH,NCLUST,pygc);
@@ -1316,7 +1322,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
     for(j=0;j<XLENGTH;j++){
       fprintf(aFile,"%d: ",j);
       for(i=0;i<NCLUST;i++){
-	fprintf(aFile,"%f ",pcgx[i][j]);
+	fprintf(aFile,"%e ",pcgx[i][j]);
       }
       fprintf(aFile,"\n");
     }
@@ -1329,7 +1335,7 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
     for(j=0;j<NCLUST;j++){
       fprintf(cFile,"%d: ",j);
       for(i=0;i<YLENGTH;i++){
-	fprintf(cFile,"%f ",pygc[i][j]);
+	fprintf(cFile,"%e ",pygc[i][j]);
       }
       fprintf(cFile,"\n");
     }
