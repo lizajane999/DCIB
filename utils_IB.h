@@ -17,10 +17,13 @@ void marg_py(int XLENGTH, int YLENGTH, histogram_t *pxy, double py[YLENGTH]);
 void conditional(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH], histogram_t *pygx);
 double I_XY(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH], double py[YLENGTH]);
 double I_YgX(int XLENGTH, int YLENGTH, double **pygc, double px[XLENGTH], double py[YLENGTH]);
+double I_cgx(int XLENGTH, int NCLUST, histogram_t *pcgx, double px[XLENGTH], histogram_t *pc);
+double I_ygc(int NCLUST, int YLENGTH, histogram_t *pygc, histogram_t *pc, double py[YLENGTH]);
 double H_X(int XLENGTH, double px[XLENGTH]);
 //bool Bayes(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH],double **pxgy);
 bool Bayes(int XLENGTH, int YLENGTH, histogram_t *pygx, double px[XLENGTH], histogram_t *pxgy);
-bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NCLUST]);
+//bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NCLUST]);
+bool P_c(int XLENGTH, int NCLUST, histogram_t *pcx, double px[XLENGTH], histogram_t *pc);
 //==================================================================================================
 // Input: XLENGTH, YLENGTH, NCLUST, p(c|x), p(x), p(y|x)
 // Output: p(y|c)
@@ -38,7 +41,8 @@ void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogra
 // DKL (of two vectors containing probability densities)
 // Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
 // Output: DKL[ p(y|x) || p(y|c)]
-double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH]);
+//double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH]);
+double D_KL(int XLENGTH, histogram_t *px1, histogram_t *px2);
 //==================================================================================================
 // Input: XLENGTH, NCLUST, DKL[ p(y|x) || p(y|c)], p(c), beta
 // Output: p(c|x), p(c)

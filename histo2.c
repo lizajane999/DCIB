@@ -136,6 +136,24 @@ double histogram_entropy(histogram_t *self)
   return log(total) - clogc / total;
 }
 
+//copies one hist to another, assumes copy is init to correct size.
+void histogram_copy(histogram_t *self, histogram_t *copy)
+{
+  int h;
+  record_t *p;
+  // clean out the copy before setting
+  histogram_clear(copy);
+  /* loop on the buckets */
+  for (h=0; h<self->hsize; h++) {
+    /* loop on records in list */
+    for (p = self->buckets[h]; p; p=p->next) {
+      if(p){
+	histogram_set(copy,p->x,p->y,p->w);
+      }
+    }
+  }
+}
+
 void histogram_print(histogram_t *self)
 {
   int h;

@@ -55,70 +55,6 @@ void ini_pygc(int NCLUSTnow, int YLENGTH, int NCLUST, histogram_t *pygc)
   }
 }
 
-//==================================================================================================
-// pic input cluster centers p(y|c) from input distribution p(y|x) at random. and then perturb a bit.
-void pic_pygc(int XLENGTH, int YLENGTH, int NCLUST, double pygc[YLENGTH][NCLUST], double pygx[YLENGTH][XLENGTH])
-{ 
-  int i, j, k, l;
-  int list[100];
-  bool redo = false;
-  double vec1[YLENGTH];
-  double vec2[YLENGTH];
-  double D = 100;
-  double Dmin = 100000;
-
-  // compute min DKL between any two example distributions
-  for(k=0; k<NCLUST; k++){
-    for(j = 0; j< YLENGTH; j++){
-      vec1[j] = pygx[j][k];
-    }
-    for(l=0; l<k; l++){
-      for(j = 0; j< YLENGTH; j++){
-	vec2[j] = pygc[j][l];
-      }
-      D =  D_KL(YLENGTH, vec1, vec2);
-      if(Dmin > D){
-	Dmin = D;
-      }
-    }
-  }
-
-  k = 0;
-  while(k< NCLUST){
-    i = irand_uniform(0, XLENGTH - 1);
-    redo = false;
-    if(k>0){ 
-      for(l=0; l<k; l++){
-	if(list[l]==i){ // did this cluster get picked before?
-	  redo = true;
-	}	    
-      }
-      if(redo == false){ // is the center similar to one that got picked before?
-	for(j = 0; j< YLENGTH; j++){
-	  vec1[j] = pygx[j][i];
-	}
-	for(l=0; l<k; l++){
-	  for(j = 0; j< YLENGTH; j++){
-	    vec2[j] = pygc[j][l];
-	  }
-	  D =  D_KL(YLENGTH, vec1, vec2);
-	  if(D <= Dmin+Dmin/5){ // D_kl should not smaller than smallest D_kl +20% (arbitrary threshold value)  
-	    redo = true;
-	  }
-	}
-      }
-    }
-    if(redo == false){
-      list[k] = i;
-      for(j = 0; j< YLENGTH; j++){
-	pygc[j][k] = pygx[j][i];
-      }
-      k++;
-    }
-  }
- 
-  // perturb_pygc(0.001, YLENGTH, NCLUST, pygc);
-}
 
 //==================================================================================================
 // make (random) input assignment p(c|x) 
@@ -255,9 +191,47 @@ double I_XY(int XLENGTH, int YLENGTH, histogram_t *pxy, double px[XLENGTH], doub
 }
 
 //==================================================================================================
-// compute total mutual information I(X;Y)
-// Input = XLENGTH, YLENGTH, py_given_x, px, py
-// Output = I(X;Y) in bits
+// compute total mutual information I(C;X)
+// Input = XLENGTH, NCLUST, p(y|x), p(x), p(c)
+// Output =  I(C;X)
+//Icx = I_YgX(XLENGTH, NCLUST, pcgx, px, pc);
+double I_cgx(int XLENGTH, int NCLUST, histogram_t *pcgx, double px[XLENGTH], histogram_t *pc)
+{ 
+  double p,q,r,Icx = 0;
+  int i, j;
+  for(i=0;i<XLENGTH;i++)
+  {
+    for(j=0;j<NCLUST;j++)
+    {
+      if((p = histogram_get(pcgx,j,i)) && ((r = px[i]) > 0) && (q = histogram_get(pc,j,0))){
+	Icx += p * r * log(p / q);
+      }
+    }
+  }  
+  Icx /= log(2.0);
+  return Icx;
+}
+//==================================================================================================
+// compute total mutual information I(C;Y)
+// Input = NCLUST, YLENGTH, p(y|c), p(c), p(y)
+// Output =  I(C;Y)
+// compute I(C;Y)
+//Icy = I_ygc(NCLUST, YLENGTH, pygc, pc, py)
+double I_ygc(int NCLUST, int YLENGTH, histogram_t *pygc, histogram_t *pc, double py[YLENGTH])
+{ 
+  double p,q,r,Icy = 0;
+  int i, j;
+  for(i=0;i<NCLUST;i++)
+  {
+    for(j=0;j<YLENGTH;j++)
+    {
+      if((p = histogram_get(pygc,j,i)) && (q = histogram_get(pc,i,0)) && ((r = py[j]) > 0))
+	Icy += p * q * log( p / r);
+    }
+  }  
+  Icy /= log(2.0);
+  return Icy;
+}
 
 double I_YgX(int XLENGTH, int YLENGTH, double **pygx, double px[XLENGTH], double py[YLENGTH])
 { 
@@ -290,7 +264,7 @@ double H_X(int XLENGTH, double px[XLENGTH])
   Hx /= log(2.0);
   return Hx;
 }
-//*************TODO*********************************
+
 //==================================================================================================
 // BAYES RULE
 // Input XLENGTH, YLENGTH, p(y|x), p(x)
@@ -340,28 +314,32 @@ bool Bayes(int XLENGTH, int YLENGTH, histogram_t *pygx, double px[XLENGTH], hist
   return t;
 }
 
-//*************TODO******************************
 //==================================================================================================
 // compute p(c) from p(c|x) and p(x)
-bool P_c(int XLENGTH, int NCLUST, double **pcx, double px[XLENGTH], double pc[NCLUST])
+bool P_c(int XLENGTH, int NCLUST, histogram_t *pcx, double px[XLENGTH], histogram_t *pc)
 {
   int i,k;
-  double checksum = 0.0;  
+  double p, checksum = 0.0;  
   bool t = false;
-
+  //p(c) histogram indexing is k,0 for all clusters k
+  //clear out old
+  histogram_clear(pc);
   for(k=0; k<NCLUST; k++){ 
-    pc[k] = 0;
     for(i=0; i<XLENGTH; i++){
-      pc[k] += pcx[k][i] * px[i];
+      if((p = histogram_get(pcx,k,i))){
+	histogram_add(pc,k,0, (p * px[i]));
+	//pc[k] += pcx[k][i] * px[i];
+      }
     }
-    if(pc[k] == 0){
+    p = histogram_get(pc,k,0);
+    if(!p){
       t = true;
-   //   printf("P_c: pc[%d] = %e\n", k, pc[k]);
-    }
-    checksum += pc[k]; 
+      printf("P_c: cluster %d has zero\n", k);
+    } // a cluster has been eliminated
+    checksum += p; 
   }
 
-  if(checksum > 1.0001 || checksum < 1 - 0.0001){
+  if(checksum > 1.0000001 || checksum < 1 - 0.0000001){
     printf("P_c: error normalizing p(c). sum = %e\n", checksum);
     t = true;
   }
@@ -377,7 +355,7 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
 { 
 
   int i,j,k;
-  double p,sum = 0;
+  double p,q,sum = 0;
   bool alarm = false;
   bool t = false;
   bool debug = false;
@@ -386,9 +364,8 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
   // to avoind that, have to ad small noise to p(c|x) in Estep or EM !!
   histogram_t *pxgc;
   pxgc = histogram_create(XLENGTH*NCLUST);
-///***************************** HERE ******************************************************
   printf("Mstep: \n"); 
-  // compute p(x|c)
+  // compute p(x|c) from p(c|x)p(x)
   alarm = Bayes(XLENGTH, NCLUST, pcgx, px, pxgc);
   if (alarm == true){
     printf("Mstep: Bayes returns alarm. p(c|x) or p(x) must have zeros.\n");
@@ -398,53 +375,35 @@ bool Mstep(int XLENGTH, int YLENGTH, int NCLUST, histogram_t *pygx, double px[XL
      printf("\n Mstep: p(x|c)\n");     
     for(i=0; i<XLENGTH; i++){
       for(k=0; k<NCLUST; k++){
-	printf("%e \t", histogram_get(pxgc,i,k); 
+	printf("%e \t", histogram_get(pxgc,i,k)); 
       }
       printf("\n");
     }
   }
-  
-  
-  //TODO ********* have to clear out old histogram here instead ***********************************
-  // compute p(y|c) = \sum_x p(y|x) p(x|c)
-  for(j=0; j<YLENGTH; j++){
-    for(k=0; k<NCLUST; k++){ 
-      pygc[j][k] = 0;
+  // compute  p(y|c)_{t+1} = \sum_x (p(y|x) *  p(x|c)_{t})
+  //clear out old
+  histogram_clear(pygc);
+  t = false; 
+  for(k=0; k<NCLUST; k++){ 
+    sum = 0;    
+    for(j=0; j<YLENGTH; j++){
+      for(i=0; i<XLENGTH; i++){
+	if((p = histogram_get(pygx,i,j)) && (q = histogram_get(pxgc,i,k))){
+	  histogram_add(pygc,j,k, (p*q));
+	  //pygc[j][k] += (p * pxgc[i][k]);
+	}
+	if(debug) printf("p(x|c)[%d][%d] = %e\n",i,k, histogram_get(pxgc,i,k));
+      }
+      if(debug) printf("\n p(y|c)[%d][%d] = %e \n\n", j,k,histogram_get(pygc,j,k));
+      if((p = histogram_get(pygc,j,k))){
+	sum += p;
+      }
     }
-  } 
-//   t = false;
-//   // printf("\np(y|c); p(y|x); p(x|c):\n");    
-//   for(k=0; k<NCLUST; k++){ 
-//     sum = 0;    
-//     for(j=0; j<YLENGTH; j++){
-//       for(i=0; i<XLENGTH; i++){
-// 	if((p = histogram_get(pygx,i,j))){
-// 	  pygc[j][k] += (p * pxgc[i][k]);
-// 	}
-// 	if(debug) printf("p(x|c)[%d][%d] = %e\n",i,k, pxgc[i][k]);
-//       }
-//       if(debug) printf("\n p(y|c)[%d][%d] = %e \n\n", j,k,pygc[j][k]);
-//       sum += pygc[j][k];
-//       if(pygc[j][k] < EPS){ // check if p(y|c) = 0
-// 	t = true;
-// 	//printf("Mstep: alarm. pygc[%d][%d] = %e\n", j, k, pygc[j][k]); 
-//       }
-//     }
-//     // printf("\n");
-//     if(sum > 1 + 0.0001 || sum < 1 - 0.0001){
-//       printf("Mstep: P(y|c) not normalized properly. sum =  %e\n",sum);
-//     }
-//   }
-//   if (t == true){
-//     alarm = add_EPS_pxgy(YLENGTH, NCLUST, pygc);
-//   }
-//   if (alarm == true){
-//     printf("Mstep: add_EPS_pxgy returns alarm. p(y|c) has zeros.\n");
-//   }
-//   for(i = 0; i < XLENGTH; i++)
-//     free(pxgc[i]);
-//   free(pxgc);
-  
+    if(sum > 1 + 0.0000001 || sum < 1 - 0.0000001){
+      printf("Mstep: P(y|c) not normalized properly. sum =  %e\n",sum);
+    }
+  }
+  histogram_destroy(pxgc);  
   return alarm;
 }
 
@@ -517,7 +476,7 @@ void DKL_rescaled(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, hist
  }
  
 }
-//**************** TODO ************** send beta to this function *****************!!!!!!!!!!!!!
+
 //======================== NEW FUNCTION
 //==================================================================================================
 // rescaled DKL
@@ -563,21 +522,28 @@ void DKL_Prod(int XLENGTH, int YLENGTH, int NCLUST,  histogram_t *pygx, histogra
 
 //==================================================================================================
 // DKL (of two vectors containing probability densities)
-// Input: XLENGTH, YLENGTH, NCLUST, p(y|x), p(y|c)
-// Output: DKL[ p(y|x) || p(y|c)]
+//vectors in histo2 form with indicies x,0 for all x
+// Input: NCLUST, p(c)_new, p(c)_old
+// Output: DKL[ p(c)_new || p(c)_old]
 
-double D_KL(int XLENGTH, double px1[XLENGTH], double px2[XLENGTH])
+double D_KL(int NCLUST, histogram_t *pc_new, histogram_t *pc_old)
 {
  int i;
- double Dkl = 0;
- bool debug = false;
+ double p = 0,q = 0 ,Dkl = 0;
+ bool debug = true;
 
  if(debug) printf("\nD_KL:\n");
- for(i=0;i<XLENGTH;i++){
-   if(px1[i] > 0 && px2[i] > 0 ){
-     Dkl += px1[i] * log( px1[i] / px2[i] );
-     if(debug)printf("px1 = %e; px2 = %e; Dkl = %e\n",px1[i],px2[i],Dkl);
+ for(i = 0; i < NCLUST; i++){
+   if((p = histogram_get(pc_new,i,0)) && (q = histogram_get(pc_old,i,0))){
+   //if(px1[i] > 0 && px2[i] > 0 ){
+   //question here is what SHOULD happen if p != 0 and q = 0 --- DKL -> inf
+   //that means that cluster is added between iterations which is only possible
+   //if p(y|c) becomes non-zero in DKL_prod ? Sooo... if words move into a new cluster
+   // can this happen???
+     Dkl += p * log( p / q );
+     //Dkl += px1[i] * log( px1[i] / px2[i] );
    }
+   if(debug)printf("pc_new = %e; pc_old = %e; Dkl = %e\n",p ,q ,Dkl);
  }
  return Dkl;
 }
@@ -597,7 +563,6 @@ bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *
   bool useDKLReScale = false;
 
    printf("\nEstep: computing pcx... exp(-beta*DKL):\n");
-   //*******************************TODO********************************************************
 //   // compute p(c|x)*Z = p(c)*e^(-beta*DKL(c))
   if(!useDKLReScale){
     for(i=0;i<XLENGTH;i++){
@@ -801,7 +766,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   double Icx = 0;
   double Hx = 0;
   double Ixy = 0;
-  
+ // printme = false;
   // copy input to smaller arrays of size of current number of clusters
   histogram_t *pcgx;
   pcgx = histogram_create(NCLUST*XLENGTH);
@@ -874,9 +839,6 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   printf("\n EM: made p(x)\n");
   // print_vec(XLENGTH, px);
   
-  // compute conditional probability p(y|x) = p(x,y)/p(x)
-//  conditional(XLENGTH, YLENGTH, pxy, px, pygx);
-  
   if(printme == true){
     printf("\n EM: input to while: p(y|x)\n");
    // print_hist_inv(XLENGTH, YLENGTH, histo);
@@ -890,7 +852,7 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   }
 
   // core loop.
- //********* while(conv >= 0.1/beta){ // 0.000001){ // scale by beta.
+ while(conv >= 0.1/beta){ // 0.000001){ // scale by beta.
     
     // compute DKL. input: p(y|x) p(y|c)
   if(useDKLReScale){
@@ -916,56 +878,49 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
       printf("\n EM: p(c|x) at count = %d\n", count);
      // print_mat2(NCLUST, XLENGTH, pcgx);
     }
-//********************************* TODO ***********************************************************    
+  
     // compute p(y|c). input: p(y|x), p(c|x), p(x).
     alarm = Mstep(XLENGTH, YLENGTH, NCLUST, histo, px, pcgx, pygc);
     if(alarm == true){
       printf("EM: Mstep returns alarm. At iteration %d\n", count);
       alarm = false;
     }
-/*
+
     if(printme == true){
       printf("\n EM: p(y|c) at count = %d\n", count);
-     // print_mat2(YLENGTH, NCLUST, pygc);
+      histogram_print(pygc);
     }
 
     //save p(c) in p(c_old)
-    copy_vec(NCLUST, pc, pc_old);
-    
+    histogram_copy(pc,pc_old);
+    printf("EM: p(c):\n");
+    histogram_print(pc);
+    printf("EM: p(c)_old:\n");
+    histogram_print(pc_old);
+ 
     //compute new p(c). input: p(c|x), p(x).
     alarm = P_c(XLENGTH, NCLUST, pcgx, px, pc);
     if(alarm == true){
       printf("EM: computing p(c). iteration %d. P_c returns alarm. p(c) either not normalized or has zeros.\n", count);
       alarm = false;
     }
-
+    printf("EM: new p(c):\n");
+    histogram_print(pc);
+   
     // convergence criterium: sum_c DKL[p(c)||p_old(c)]
     conv = D_KL(NCLUST, pc, pc_old);
 
     count=count+1;
     printf("EM: iteration %d; conv = %e; beta = %e\n\n", count, conv,beta);
+    
   } //conv loop
-  
+   
   // copy back 
-  for(k=0; k<NCLUST; k++){
-    FULLpc[k] = pc[k];
-    for(i=0; i<XLENGTH; i++){
-      FULLpcgx[k][i] = pcgx[k][i];
-    }
-    for(j=0;j<YLENGTH; j++){
-      FULLpygc[j][k] = pygc[j][k]; 
-    }
-  }
-  for(k=NCLUST; k<NCLUSTmax; k++){ //fill rest with zeros
-    FULLpc[k] = EPS;
-    for(i=0; i<XLENGTH; i++){
-      FULLpcgx[k][i] = EPS;
-    }
-    for(j=0;j<YLENGTH; j++){
-      FULLpygc[j][k] = EPS; 
-    }
-  }
-      
+  
+  histogram_copy(pc, FULLpc);
+  histogram_copy(pcgx, FULLpcgx);
+  histogram_copy(pygc, FULLpygc);
+
   // compute H(X)
   Hx = H_X(XLENGTH, px);
   infocurve[0] = Hx;
@@ -975,17 +930,17 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
   infocurve[1] = Ixy;
 
   // compute I(C;X)
-  Icx = I_YgX(XLENGTH, NCLUST, pcgx, px, pc);
+  Icx = I_cgx(XLENGTH, NCLUST, pcgx, px, pc);
   infocurve[2] = Icx;
  
   // compute I(C;Y)
-  Icy = I_YgX(NCLUST, YLENGTH, pygc, pc, py);
+  Icy = I_ygc(NCLUST, YLENGTH, pygc, pc, py);
   infocurve[3] = Icy;
-  
+ 
   //F = Icy - Icx/beta; // F unscaled
   F = Icy / Ixy - Icx / (Hx * beta); // F scaled
   //  printf("EM result: F = %e \n", F);
-*/
+
 //clear hashes
   histogram_destroy(DKL);
   histogram_destroy(pygc);
@@ -1170,6 +1125,8 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta_start,
   
   // run the OCI/IB/EM algorithm. It uses only one cluster here! NCLUSTnew = 1.
   F = EM(XLENGTH, YLENGTH, NCLUSTnew, 2*NCLUST, b, pxy, histo, FULLpcgx, FULLpygc, FULLpc, infocurve, plotme);
+  
+  //*******************************************TODO*********************************************************************
   /*
   if(plotme == true){  
     printf("Done with first IB step in annealing.\nINITIAL CENTER (unused centers in this array are set to zero):\n"); 
