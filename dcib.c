@@ -44,16 +44,16 @@ int main(int argc, char * argv[])
   int HLENGTH;
   double px[XLENGTH];
   double py[YLENGTH];
-  double beta = 10.1;
+  double beta = .00001;
   double F;
   double infocurve[4] = {1,1,1,1};
   //int modus = 0;
-  // modus = 0 : use p(y|c) cluster centers as initialization 
-  // modus = 1 : use p(c|x) assignment ruls as initialization 
+  // modus = 0 : use p(y|c) cluster centers as initialization
+  // modus = 1 : use p(c|x) assignment ruls as initialization
   double annealingrate = 1.1;
   bool plotme = true; //some debug printing
   bool debug = false;//verbose debug printing
-  
+
 
   FILE * histFile;
   FILE * probFile;
@@ -62,14 +62,14 @@ int main(int argc, char * argv[])
   histogram_t *pygc;
   histogram_t *pcgx;
   histogram_t *pc;
-  
+
   if(plotme)
   {
     printf("XLENGTH= %d\n", XLENGTH);
     printf("YLENGTH= %d\n", YLENGTH);
     printf("NCLUST = %d\n", NCLUST);
   }
-  
+
   histFile = fopen(histoName, "r");
   if(histFile == NULL)
   {
@@ -82,32 +82,32 @@ int main(int argc, char * argv[])
   int x;
   char s [YLENGTH*20];
   char * tok;
-  
+
 //   //allocate memory for large cluster probability arrays
 //   double** pygc;
 //   //allocate pointer memory for first dimension
 //   pygc = (double**)malloc(YLENGTH*sizeof(double));
 //   if(NULL == pygc){free(pygc); printf("Memory allocation failed while allocating for pygc[].\n"); exit(-1);}
-//   
+//
 //   /*allocate memory for second dimension */
 //   for(i = 0; i < YLENGTH;i++)
 //   {
 //     pygc[i] = (double *) malloc( NCLUST * sizeof(double) );
 //     if(NULL == pygc[i]){free(pygc[i]); printf("Memory allocation failed while allocating for matrix[x][].\n"); exit(-1);}
 //   }
-// 
+//
 //   double** pcgx;
 //   //allocate pointer memory for first dimension
 //   pcgx = (double**)malloc(NCLUST*sizeof(double));
 //   if(NULL == pcgx){free(pcgx); printf("Memory allocation failed while allocating for pcgx[].\n"); exit(-1);}
-//   
+//
 //   /*allocate memory for second dimension */
 //   for(i = 0; i < NCLUST;i++)
 //   {
 //     pcgx[i] = (double *) malloc( XLENGTH * sizeof(double) );
 //     if(NULL == pcgx[i]){free(pcgx[i]); printf("Memory allocation failed while allocating for matrix[x][].\n"); exit(-1);}
 //   }
-  
+
   //count how many entries are actually in the histogram file -- these are only the non-zero p(y|x)
   while(fscanf(histFile, "%f", &v)!= EOF)
   {
@@ -129,13 +129,13 @@ int main(int argc, char * argv[])
       if(debug){printf("Found word: %d\n", atoi(tok));}
       y = atoi(tok);
       tok = strtok(NULL, "\t");
-      if(tok != NULL) //hits null in the word 
+      if(tok != NULL) //hits null in the word
       {
 	if(debug){printf("Found value: %f\n", atof(tok));}
 	v = atof(tok);
 	tok = strtok(NULL, "\t");
 	histogram_set(histo,x,y,v);
-      }       
+      }
     }
     x++;
   }
@@ -148,7 +148,7 @@ int main(int argc, char * argv[])
       {
 	  if((v = histogram_get(histo, x, y)))
 	  {
-	    printf("Found doc %d - word %d in histo: %f\n",x,y,v); 
+	    printf("Found doc %d - word %d in histo: %f\n",x,y,v);
 	  }
       }
     }
@@ -215,13 +215,13 @@ int main(int argc, char * argv[])
       //printf("Found word: %d\n", atoi(tok));
       y = atoi(tok);
       tok = strtok(NULL, "\t");
-      if(tok != NULL) //hits null in the word 
+      if(tok != NULL) //hits null in the word
       {
 	//printf("Found value: %f\n", atof(tok));
 	v = atof(tok);
 	tok = strtok(NULL, "\t");
 	histogram_set(pxy,x,y,v);
-      }       
+      }
     }
     x++;
   }
@@ -234,7 +234,7 @@ int main(int argc, char * argv[])
       {
 	if((v = histogram_get(pxy, x, y)))
 	{
-	  printf("Found doc %d - word %d in histo: %f\n",x,y,v); 
+	  printf("Found doc %d - word %d in histo: %f\n",x,y,v);
 	}
       }
     }
@@ -246,20 +246,20 @@ printf("Now going to anneal\n");
 //******************* NOW GO TO ANNEAL **************************
 F = anneal(XLENGTH, YLENGTH, NCLUST, beta, pxy, histo, pcgx, pygc, pc,
 		   infocurve, annealingrate, plotme);
-  
-printf("Returned from anneal\n");  
+
+printf("Returned from anneal\n");
   //cleanup
   histogram_destroy(pxy);
   histogram_destroy(histo);
   histogram_destroy(pygc);
   histogram_destroy(pcgx);
-  histogram_destroy(pc);  
+  histogram_destroy(pc);
 //   for(i = 0; i < YLENGTH; i++)
 //     free(pygc[i]);
 //   free(pygc);
 //   for(i = 0; i < NCLUST; i++)
 //     free(pcgx[i]);
 //   free(pcgx);
-  
+
   exit(1);
 }

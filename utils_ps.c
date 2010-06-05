@@ -28,14 +28,10 @@ void print_mat(int xlength, int ylength, histogram_t *histo)
   int i, j;
   double p;
   for(i=0;i<xlength;i++){
-    printf("x%d: ",i);
+    printf("x = %d: ",i);
     for(j=0;j<ylength;j++){
-      if((p = histogram_get(histo,i,j))){
-	printf("%d:%f ",j,p);
-      }
-//       else{
-// 	printf("%f ",z);
-//       }
+	p = histogram_get(histo,i,j);
+	printf("y = %d: %e\t",j,p);
     }
     printf("\n");
   }
@@ -224,7 +220,7 @@ bool checknorm_vec(int xlength, double px[xlength])
   double checksum = 0.0;
   int i;
   bool alarm = false;
-  
+
   for(i=0;i<xlength;i++){
     checksum += px[i];
   }

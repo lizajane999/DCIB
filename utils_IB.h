@@ -1,7 +1,7 @@
-// Information Bottleneck code 
+// Information Bottleneck code
 // incl. annealing
 // Susanne Still, 2004.
-// modified to use hash tables (histogram_t) 
+// modified to use hash tables (histogram_t)
 // for large dimensional data. Lisa Miller 2010
 
 #include <stdlib.h>
@@ -49,9 +49,10 @@ double D_KL(int XLENGTH, histogram_t *px1, histogram_t *px2);
 bool Estep(int XLENGTH, int NCLUST, double beta, histogram_t *DKL, histogram_t *pc, histogram_t *pcgx);
 //==================================================================================================
 // perturb cluster centers
-void perturb_pygc(double pert, int YLENGTH, int NCLUST, double **pygc);
+//void perturb_pygc(double pert, int YLENGTH, int NCLUST, double **pygc);
+void perturb_pygc(double pert, int YLENGTH, int NCLUST, histogram_t *pygc);
 //==================================================================================================
-// compute self-consistent IB equations 
+// compute self-consistent IB equations
 // NEEDS NORMALIZED HISTOGRAM AS INPUT:  p(x,y)
 // Input: XLENGTH, YLENGTH,  NCLUST, p(x,y), p(c|x) -- initialization
 // Output: p(c|x), p(y|c)
@@ -60,17 +61,19 @@ double EM(int XLENGTH, int YLENGTH, int NCLUST, int NCLUSTmax, double beta,
 	  histogram_t *pxy,
 	  histogram_t *histo,
 	  histogram_t *FULLpcgx,
-	  histogram_t *FULLpygc, 
+	  histogram_t *FULLpygc,
 	  histogram_t *FULLpc,
 	  double infocurve[4],
 	  bool printme);
 
 //=================================================================================================
 // split clusters
-bool split(int NCLUSTnow[], int NCLUSTmax, int YLENGTH, double **pygc);
+//bool split(int NCLUSTnow[], int NCLUSTmax, int YLENGTH, double **pygc);
+bool split(int NCLUSTnow[], int NCLUSTmax, int YLENGTH, histogram_t *pygc);
 //=================================================================================================
 // merge clusters
-int merge(double beta, int NCLUSTnow, int NCLUSTmax, int YLENGTH, double **pygc);
+//int merge(double beta, int NCLUSTnow, int NCLUSTmax, int YLENGTH, double **pygc);
+int merge(double beta, int NCLUSTnow, int NCLUSTmax, int YLENGTH, histogram_t *pygc);
 //=================================================================================================
 //check if cluster assignments are (almost) deterministic
 bool det(int NCLUSTnow, int NCLUSTmax, int XLENGTH, double **pcgx);
@@ -83,9 +86,9 @@ double anneal(int XLENGTH, int YLENGTH, int NCLUST, double beta,
 		      histogram_t *pxy,
 		      histogram_t *histo,
 		      histogram_t *pcgx,
-		      histogram_t *pygc, 
+		      histogram_t *pygc,
 		      histogram_t *pc,
-		      double infocurve[4], 
+		      double infocurve[4],
 		      double annealingrate, bool plotme);
 //==================================================================================================
 
